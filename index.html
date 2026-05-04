@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supervisión Universitaria · nricci.dev</title>
+  <!-- Frappe Gantt v1.2.2 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@1.2.2/dist/frappe-gantt.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d28;
+      --surface-2: #232738;
+      --border: #2a2e3f;
+      --text: #e4e6f0;
+      --text-muted: #8b8fa3;
+      --primary: #6366f1;
+      --primary-hover: #818cf8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #22c55e;
+      --radius: 10px;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── HEADER ─── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1 span { color: var(--primary); }
+    header .badge {
+      font-size: .7rem;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* ─── LAYOUT ─── */
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+    @media (max-width: 1000px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+      max-height: calc(100vh - 64px);
+    }
+    .sidebar h2 {
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .sidebar .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-card {
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-card .value { font-size: 1.4rem; font-weight: 700; }
+    .stat-card .label { font-size: .7rem; color: var(--text-muted); margin-top: 2px; }
+    .stat-card.danger .value { color: var(--danger); }
+    .stat-card.warning .value { color: var(--warning); }
+    .stat-card.success .value { color: var(--success); }
+
+    .project-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .project-item {
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: background .15s;
+      border: 1px solid transparent;
+    }
+    .project-item:hover { background: var(--border); }
+    .project-item.active { border-color: var(--primary); }
+    .project-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .project-info { flex: 1; min-width: 0; }
+    .project-info .name { font-size: .82rem; font-weight: 500; }
+    .project-info .meta { font-size: .7rem; color: var(--text-muted); }
+    .project-info .progress-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+    .project-info .progress-bar .fill {
+      height: 100%;
+      border-radius: 4px;
+      background: var(--primary);
+      transition: width .3s;
+    }
+
+    /* ─── MAIN ─── */
+    .main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-wrap: wrap;
+    }
+    .toolbar .group { display: flex; gap: 6px; align-items: center; }
+    .toolbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+    /* ─── TASK TABLE + GANTT ─── */
+    .gantt-wrapper {
+      flex: 1;
+      overflow: auto;
+      padding: 8px 12px 12px;
+      min-height: 400px;
+    }
+    /* Frappe Gantt overrides */
+    .gantt { width: 100%; min-width: 800px; }
+    .gantt .bar { fill: var(--primary) !important; }
+    .gantt .bar-label { fill: #fff !important; font-size: 11px !important; }
+    .gantt .bar-progress { fill: var(--primary-hover) !important; }
+    .gantt .grid-header { fill: var(--surface-2) !important; }
+    .gantt .grid-row { fill: var(--surface) !important; }
+    .gantt .grid-row:nth-child(2n) { fill: var(--surface-2) !important; }
+    .gantt .today-highlight { fill: rgba(99,102,241,.12) !important; }
+    .gantt .today-highlight-line { stroke: var(--primary) !important; stroke-width: 2px !important; }
+    .gantt text { fill: var(--text) !important; }
+    .gantt .weekend { fill: rgba(255,255,255,.02) !important; }
+
+    /* Copiar botón */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      transition: all .15s;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .btn:hover { background: var(--border); border-color: var(--text-muted); }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn-sm { padding: 4px 10px; font-size: .75rem; }
+    .btn-icon { padding: 5px 8px; }
+
+    /* ─── MODAL ─── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 520px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal h3 { font-size: 1rem; margin-bottom: 16px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: .8rem; color: var(--text-muted); margin-bottom: 4px; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: .85rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--primary);
+    }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+    /* ─── TOAST ─── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: .82rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all .3s ease;
+      pointer-events: none;
+      z-index: 2000;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ─── TABLE ─── */
+    .task-table-wrap {
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .task-table-wrap table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .78rem;
+    }
+    .task-table-wrap th {
+      position: sticky;
+      top: 0;
+      background: var(--surface-2);
+      text-align: left;
+      padding: 8px 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border);
+    }
+    .task-table-wrap td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .task-table-wrap tr:hover td { background: var(--surface-2); }
+    .task-table-wrap td .assignee {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 22px;
+      font-size: .7rem;
+      font-weight: 600;
+    }
+    .progress-pill {
+      display: inline-block;
+      height: 4px;
+      width: 50px;
+      background: var(--border);
+      border-radius: 4px;
+      vertical-align: middle;
+      overflow: hidden;
+    }
+    .progress-pill .fill { height: 100%; background: var(--primary); border-radius: 4px; }
+    .status-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: .68rem;
+      font-weight: 500;
+    }
+    .status-badge.open { background: rgba(99,102,241,.15); color: var(--primary); }
+    .status-badge.in-progress { background: rgba(245,158,11,.15); color: var(--warning); }
+    .status-badge.done { background: rgba(34,197,94,.15); color: var(--success); }
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: .85rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .delete-btn:hover { color: var(--danger); background: rgba(239,68,68,.12); }
+    .edit-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: .85rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .edit-btn:hover { color: var(--primary); }
+  </style>
+</head>
+<body>
+
+  <!-- ─── HEADER ─── -->
+  <header>
+    <h1>🎓 <span>supervisión</span><span class="badge">nricci.dev</span></h1>
+    <div class="header-actions">
+      <button class="btn btn-primary btn-sm" id="btn-add-task">+ Nueva Supervisión</button>
+      <button class="btn btn-sm" id="btn-add-project">+ Programa</button>
+      <button class="btn btn-sm" id="btn-export">📤 JSON</button>
+    </div>
+  </header>
+
+  <!-- ─── LAYOUT ─── -->
+  <div class="layout">
+
+    <!-- ─── SIDEBAR ─── -->
+    <aside class="sidebar">
+      <h2>Programas</h2>
+      <div class="project-list" id="project-list"></div>
+
+      <h2 style="margin-top:4px">Resumen</h2>
+      <div class="stats-grid">
+        <div class="stat-card success">
+          <div class="value" id="stat-total">0</div>
+          <div class="label">Supervisiones</div>
+        </div>
+        <div class="stat-card warning">
+          <div class="value" id="stat-progress">0</div>
+          <div class="label">Activas</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" id="stat-assignees">0</div>
+          <div class="label">Tutores</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="value" id="stat-overdue">0</div>
+          <div class="label">Atrasadas</div>
+        </div>
+      </div>
+      <p style="font-size:.72rem;color:var(--text-muted);margin-top:auto;text-align:center;padding-top:8px">
+        📚 Supervisión universitaria — datos en localStorage
+      </p>
+    </aside>
+
+    <!-- ─── MAIN ─── -->
+    <div class="main">
+      <div class="toolbar">
+        <div class="group">
+          <span style="font-size:.75rem;color:var(--text-muted)">Vista:</span>
+          <button class="btn btn-sm btn-icon" data-view="Day" title="Día">D</button>
+          <button class="btn btn-sm btn-icon" data-view="Week" title="Semana active">S</button>
+          <button class="btn btn-sm btn-icon active" data-view="Month" title="Mes">M</button>
+        </div>
+        <div class="sep"></div>
+        <div class="group">
+          <button class="btn btn-sm" id="btn-zoom-in">🔍+</button>
+          <button class="btn btn-sm" id="btn-zoom-out">🔍−</button>
+        </div>
+        <div class="sep"></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="filter-text" placeholder="Filtrar supervisiones…" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.78rem;color:var(--text);font-family:inherit;width:160px;outline:none">
+        </div>
+        <div class="sep"></div>
+        <select id="filter-project" style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:.78rem;color:var(--text);font-family:inherit;outline:none">
+          <option value="all">Todos los programas</option>
+        </select>
+      </div>
+
+      <!-- Tabla de supervisiones -->
+      <div class="task-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:30px">#</th>
+              <th>Supervisión</th>
+              <th>Programa</th>
+              <th>Tutor</th>
+              <th>Inicio</th>
+              <th>Fin</th>
+              <th>Avance</th>
+              <th>Estado</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody id="task-table-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Gantt -->
+      <div class="gantt-wrapper" id="gantt-wrapper">
+        <svg id="gantt-chart"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── MODALS ─── -->
+
+  <!-- Modal Supervisión -->
+  <div class="modal-overlay" id="modal-task">
+    <div class="modal">
+      <h3 id="modal-task-title">Nueva Supervisión</h3>
+      <input type="hidden" id="task-id" />
+      <div class="form-group">
+        <label>Nombre de la supervisión</label>
+        <input type="text" id="task-name" placeholder="Ej: Revisión de avance de tesis" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tutor</label>
+          <input type="text" id="task-assignee" placeholder="Nombre del docente" />
+        </div>
+        <div class="form-group">
+          <label>Programa</label>
+          <select id="task-project"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Inicio</label>
+          <input type="date" id="task-start" />
+        </div>
+        <div class="form-group">
+          <label>Fin</label>
+          <input type="date" id="task-end" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Avance (%)</label>
+          <input type="number" id="task-progress" min="0" max="100" value="0" />
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="task-status">
+            <option value="open">Pendiente</option>
+            <option value="in-progress">En proceso</option>
+            <option value="done">Finalizada</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-modal-close">Cancelar</button>
+        <button class="btn btn-primary" id="btn-modal-save">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Programa -->
+  <div class="modal-overlay" id="modal-project">
+    <div class="modal">
+      <h3>Nuevo Programa</h3>
+      <div class="form-group">
+        <label>Nombre del programa</label>
+        <input type="text" id="project-name" placeholder="Ej: Ingeniería Civil" />
+      </div>
+      <div class="form-group">
+        <label>Color</label>
+        <input type="color" id="project-color" value="#6366f1" style="height:36px;padding:2px" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-project-close">Cancelar</button>
+        <button class="btn btn-primary" id="btn-project-save">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@1.2.2/dist/frappe-gantt.umd.js"></script>
+  <script>
+  // ═══════════════════════════════════════════════════════════
+  //  STATE
+  // ═══════════════════════════════════════════════════════════
+  let projects = [
+    { id: 'p1', name: 'Ing. Informática', color: '#6366f1' },
+    { id: 'p2', name: 'Ing. Industrial', color: '#22c55e' },
+    { id: 'p3', name: 'Arquitectura', color: '#f59e0b' },
+  ];
+  let tasks = [
+    { id: 't1', name: 'Revisión Tesis Pregrado', project: 'p1', assignee: 'Dra. María', start: '2026-04-28', end: '2026-05-05', progress: 60, status: 'in-progress' },
+    { id: 't2', name: 'Plan de Estudios 2026', project: 'p1', assignee: 'Mg. Luis', start: '2026-05-05', end: '2026-05-15', progress: 20, status: 'in-progress' },
+    { id: 't3', name: 'Acreditación Institucional', project: 'p1', assignee: 'Dra. María', start: '2026-05-15', end: '2026-05-25', progress: 0, status: 'open' },
+    { id: 't4', name: 'Prácticas Pre-Profesionales', project: 'p2', assignee: 'Dr. Carlos', start: '2026-04-25', end: '2026-05-10', progress: 45, status: 'in-progress' },
+    { id: 't5', name: 'Revisión Sílabos', project: 'p2', assignee: 'Dr. Carlos', start: '2026-05-10', end: '2026-05-20', progress: 0, status: 'open' },
+    { id: 't6', name: 'Diseño Malla Curricular', project: 'p3', assignee: 'Arq. Sofía', start: '2026-05-01', end: '2026-05-08', progress: 100, status: 'done' },
+    { id: 't7', name: 'Supervisión Talleres', project: 'p3', assignee: 'Arq. Sofía', start: '2026-05-08', end: '2026-05-18', progress: 10, status: 'in-progress' },
+  ];
+  let nextTaskId = 8;
+  let nextProjectId = 4;
+
+  let gantt = null;
+  let currentView = 'Month';
+  const STORAGE_KEY = 'nricci-panel-data';
+
+  // ─── Persistencia ───
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ projects, tasks, nextTaskId, nextProjectId }));
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        projects = data.projects || projects;
+        tasks = data.tasks || tasks;
+        nextTaskId = data.nextTaskId || tasks.length + 1;
+        nextProjectId = data.nextProjectId || projects.length + 1;
+      }
+    } catch(e) {}
+    // Ensure all tasks have a status field
+    tasks.forEach(t => { if (!t.status) t.status = 'open'; });
+  }
+
+  // ─── Helpers ───
+  function taskProgressClass(p) {
+    if (p >= 100) return 'done';
+    if (p > 0) return 'in-progress';
+    return 'open';
+  }
+
+  function getAssigneeInitial(name) {
+    return name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  function formatDate(d) {
+    const parts = d.split('-');
+    return `${parts[2]}/${parts[1]}`;
+  }
+
+  function overdue(t) {
+    if (t.status === 'done') return false;
+    return new Date(t.end) < new Date(new Date().toDateString());
+  }
+
+  function projectById(id) {
+    return projects.find(p => p.id === id) || { name: id, color: '#6366f1' };
+  }
+
+  // ─── Toast ───
+  let toastTimer;
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  RENDER
+  // ═══════════════════════════════════════════════════════════
+  function getFilteredTasks() {
+    const filterText = (document.getElementById('filter-text').value || '').toLowerCase();
+    const filterProject = document.getElementById('filter-project').value;
+    return tasks.filter(t => {
+      if (filterProject !== 'all' && t.project !== filterProject) return false;
+      if (filterText) {
+        const p = projectById(t.project);
+        return t.name.toLowerCase().includes(filterText) ||
+               t.assignee.toLowerCase().includes(filterText) ||
+               p.name.toLowerCase().includes(filterText);
+      }
+      return true;
+    });
+  }
+
+  function renderSidebar() {
+    const list = document.getElementById('project-list');
+    list.innerHTML = '';
+    projects.forEach(p => {
+      const pTasks = tasks.filter(t => t.project === p.id);
+      const done = pTasks.filter(t => t.status === 'done').length;
+      const pct = pTasks.length ? Math.round((done / pTasks.length) * 100) : 0;
+      const div = document.createElement('div');
+      div.className = 'project-item';
+      div.innerHTML = `
+        <div class="project-dot" style="background:${p.color}"></div>
+        <div class="project-info">
+          <div class="name">${p.name}</div>
+          <div class="meta">${pTasks.length} supervisiones · ${done} finalizadas</div>
+          <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+        </div>
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  function renderStats() {
+    const active = tasks.filter(t => t.status !== 'done').length;
+    const inProgress = tasks.filter(t => t.status === 'in-progress').length;
+    const unique = new Set(tasks.map(t => t.assignee)).size;
+    const over = tasks.filter(t => overdue(t)).length;
+    document.getElementById('stat-total').textContent = tasks.length;
+    document.getElementById('stat-progress').textContent = inProgress;
+    document.getElementById('stat-assignees').textContent = unique;
+    document.getElementById('stat-overdue').textContent = over;
+  }
+
+  function renderTable() {
+    const filtered = getFilteredTasks();
+    const tbody = document.getElementById('task-table-body');
+    tbody.innerHTML = '';
+    filtered.forEach((t, i) => {
+      const p = projectById(t.project);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="color:var(--text-muted)">${i+1}</td>
+        <td><strong>${t.name}</strong></td>
+        <td><span style="color:${p.color}">●</span> ${p.name}</td>
+        <td><span class="assignee">${getAssigneeInitial(t.assignee)}</span> ${t.assignee}</td>
+        <td>${formatDate(t.start)}</td>
+        <td>${formatDate(t.end)}</td>
+        <td>
+          <div class="progress-pill"><div class="fill" style="width:${t.progress}%"></div></div>
+          <span style="font-size:.7rem;color:var(--text-muted);margin-left:4px">${t.progress}%</span>
+        </td>
+        <td><span class="status-badge ${t.status}">${t.status === 'open' ? 'Pendiente' : t.status === 'in-progress' ? 'En proceso' : 'Finalizada'}</span></td>
+        <td>
+          <button class="edit-btn" data-id="${t.id}" title="Editar">✏️</button>
+          <button class="delete-btn" data-id="${t.id}" title="Eliminar">✕</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Event listeners
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        if (confirm('¿Eliminar esta supervisión?')) {
+          tasks = tasks.filter(t => t.id !== id);
+          fullRender();
+          showToast('Supervisión eliminada');
+        }
+      });
+    });
+    tbody.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const t = tasks.find(x => x.id === id);
+        if (t) openTaskModal(t);
+      });
+    });
+  }
+
+  function renderGantt() {
+    const filtered = getFilteredTasks();
+    const ganttData = filtered.map(t => {
+      const p = projectById(t.project);
+      return {
+        id: t.id,
+        name: t.name,
+        start: t.start,
+        end: t.end,
+        progress: t.progress / 100,
+        assignee: t.assignee,
+        project: p.name,
+        custom_class: '',
+        dependencies: '',
+      };
+    });
+
+    if (gantt) {
+      try { gantt.refresh(ganttData); } catch(e) { initGantt(ganttData); }
+    } else {
+      initGantt(ganttData);
+    }
+  }
+
+  function initGantt(data) {
+    const el = document.getElementById('gantt-chart');
+    // clear any previous SVG children
+    while (el.firstChild) el.removeChild(el.firstChild);
+
+    if (!data.length) {
+      // Show empty state
+      el.innerHTML = `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="var(--text-muted)" font-size="14">Sin supervisiones — agrega una desde el botón "Nueva Supervisión"</text>`;
+      return;
+    }
+
+    gantt = new Gantt(el, data, {
+      view_mode: currentView,
+      date_format: 'YYYY-MM-DD',
+      bar_height: 28,
+      bar_corner_radius: 4,
+      arrow_curve: 5,
+      padding: 18,
+      language: 'es',
+      today_line: true,
+      on_click: (task) => {
+        const t = tasks.find(x => x.id === task.id);
+        if (t) openTaskModal(t);
+      },
+      on_date_change: (task, start, end) => {
+        const t = tasks.find(x => x.id === task.id);
+        if (t) {
+          t.start = start;
+          t.end = end;
+          fullRender();
+          showToast('Fecha actualizada');
+        }
+      },
+      on_progress_change: (task, progress) => {
+        const t = tasks.find(x => x.id === task.id);
+        if (t) {
+          t.progress = Math.round(progress * 100);
+          t.status = taskProgressClass(t.progress);
+          fullRender();
+        }
+      },
+      on_view_change: (mode) => {
+        currentView = mode;
+      },
+    });
+  }
+
+  function renderFilterSelect() {
+    const sel = document.getElementById('filter-project');
+    const current = sel.value;
+    sel.innerHTML = '<option value="all">Todos los programas</option>';
+    projects.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    });
+    sel.value = current;
+  }
+
+  function fullRender() {
+    saveState();
+    renderSidebar();
+    renderStats();
+    renderFilterSelect();
+    renderTable();
+    renderGantt();
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  MODAL LÓGICA
+  // ═══════════════════════════════════════════════════════════
+  function populateProjectSelect(sel, selectedId) {
+    sel.innerHTML = '';
+    projects.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      if (p.id === selectedId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  function openTaskModal(task) {
+    const title = document.getElementById('modal-task-title');
+    const idField = document.getElementById('task-id');
+    const nameField = document.getElementById('task-name');
+    const assigneeField = document.getElementById('task-assignee');
+    const projectField = document.getElementById('task-project');
+    const startField = document.getElementById('task-start');
+    const endField = document.getElementById('task-end');
+    const progressField = document.getElementById('task-progress');
+    const statusField = document.getElementById('task-status');
+
+    populateProjectSelect(projectField, task ? task.project : projects[0]?.id);
+
+    if (task) {
+      title.textContent = 'Editar Supervisión';
+      idField.value = task.id;
+      nameField.value = task.name;
+      assigneeField.value = task.assignee;
+      startField.value = task.start;
+      endField.value = task.end;
+      progressField.value = task.progress;
+      statusField.value = task.status;
+    } else {
+      title.textContent = 'Nueva Supervisión';
+      idField.value = '';
+      nameField.value = '';
+      assigneeField.value = '';
+      // default dates
+      const today = new Date();
+      const weekLater = new Date(today);
+      weekLater.setDate(weekLater.getDate() + 7);
+      startField.value = today.toISOString().split('T')[0];
+      endField.value = weekLater.toISOString().split('T')[0];
+      progressField.value = 0;
+      statusField.value = 'open';
+    }
+    document.getElementById('modal-task').classList.add('open');
+  }
+
+  function saveTask() {
+    const idField = document.getElementById('task-id');
+    const name = document.getElementById('task-name').value.trim();
+    const assignee = document.getElementById('task-assignee').value.trim();
+    const project = document.getElementById('task-project').value;
+    const start = document.getElementById('task-start').value;
+    const end = document.getElementById('task-end').value;
+    const progress = parseInt(document.getElementById('task-progress').value) || 0;
+    const status = document.getElementById('task-status').value;
+
+    if (!name || !assignee || !start || !end) {
+      showToast('Completa los campos requeridos');
+      return;
+    }
+    if (new Date(end) < new Date(start)) {
+      showToast('La fecha de fin debe ser posterior al inicio');
+      return;
+    }
+
+    const id = idField.value;
+    if (id) {
+      // Edit
+      const t = tasks.find(x => x.id === id);
+      if (t) {
+        t.name = name;
+        t.assignee = assignee;
+        t.project = project;
+        t.start = start;
+        t.end = end;
+        t.progress = progress;
+        t.status = status;
+        showToast('Supervisión actualizada');
+      }
+    } else {
+      // New
+      tasks.push({
+        id: 't' + (nextTaskId++),
+        name,
+        assignee,
+        project,
+        start,
+        end,
+        progress,
+        status,
+      });
+      showToast('Supervisión creada');
+    }
+    document.getElementById('modal-task').classList.remove('open');
+    fullRender();
+  }
+
+  function saveProject() {
+    const name = document.getElementById('project-name').value.trim();
+    const color = document.getElementById('project-color').value;
+    if (!name) { showToast('Ingresa un nombre'); return; }
+    if (projects.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+      showToast('Ya existe un programa con ese nombre');
+      return;
+    }
+    projects.push({ id: 'p' + (nextProjectId++), name, color });
+    document.getElementById('modal-project').classList.remove('open');
+    document.getElementById('project-name').value = '';
+    fullRender();
+    showToast('Programa creado');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  EVENT LISTENERS
+  // ═══════════════════════════════════════════════════════════
+  document.addEventListener('DOMContentLoaded', () => {
+    loadState();
+
+    // Botones supervisión
+    document.getElementById('btn-add-task').addEventListener('click', () => openTaskModal(null));
+    document.getElementById('btn-modal-close').addEventListener('click', () => {
+      document.getElementById('modal-task').classList.remove('open');
+    });
+    document.getElementById('btn-modal-save').addEventListener('click', saveTask);
+
+    // Botones programa
+    document.getElementById('btn-add-project').addEventListener('click', () => {
+      document.getElementById('modal-project').classList.add('open');
+    });
+    document.getElementById('btn-project-close').addEventListener('click', () => {
+      document.getElementById('modal-project').classList.remove('open');
+    });
+    document.getElementById('btn-project-save').addEventListener('click', saveProject);
+
+    // Cerrar modales al hacer clic fuera
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('open');
+      });
+    });
+
+    // View modes
+    document.querySelectorAll('[data-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentView = btn.dataset.view;
+        if (gantt) {
+          gantt.change_view_mode(currentView);
+        } else {
+          renderGantt();
+        }
+      });
+    });
+
+    // Zoom
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      if (gantt) gantt.zoom_in();
+    });
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      if (gantt) gantt.zoom_out();
+    });
+
+    // Filtros
+    document.getElementById('filter-text').addEventListener('input', () => fullRender());
+    document.getElementById('filter-project').addEventListener('change', () => fullRender());
+
+    // Export
+    document.getElementById('btn-export').addEventListener('click', () => {
+      const data = { projects, tasks, exportedAt: new Date().toISOString() };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `panel-nricci-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('JSON exportado');
+    });
+
+    fullRender();
+  });
+  </script>
+</body>
+</html>
